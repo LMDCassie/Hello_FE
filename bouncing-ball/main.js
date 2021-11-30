@@ -7,7 +7,7 @@ const width = canvas.width = window.innerWidth;
 const height = canvas.height = window.innerHeight;
 
 // 生成随机数的函数
-function random(min,max) {
+function random(min, max) {
   const num = Math.floor(Math.random() * (max - min)) + min;
   return num;
 }
@@ -15,23 +15,36 @@ function random(min,max) {
 //生成随机颜色
 function randomColor() {
   return 'rgb(' +
-         random(0, 255) + ', ' +
-         random(0, 255) + ', ' +
-         random(0, 255) + ')';
+    random(0, 255) + ', ' +
+    random(0, 255) + ', ' +
+    random(0, 255) + ')';
 }
 
-//构造小球
-function Ball(x, y, velX, velY, color, size) {
+// Shape构造器
+function Shape(x, y, velX, velY, isExist) {
   this.x = x; //水平坐标
   this.y = y;
   this.velX = velX; //水平速度
   this.velY = velY;
+  this.isExist = isExist;
+}
+
+//构造小球
+function Ball(x, y, velX, velY, isExist, color, size) {
+  Shape.call(this, x, y, velX, velY, isExist);
   this.color = color;
   this.size = size; //小球半径，以像素为单位
 }
+Ball.prototype = Object.create(Shape.prototype);
+Ball.prototype.constructor = Ball;
+// Object.defineProperty(Ball.prototype, 'constructor', {
+//   value: Ball,
+//   enumerable: false,
+//   writable: true
+// });
 
 //画出小球
-Ball.prototype.draw = function() {
+Ball.prototype.draw = function () {
   ctx.beginPath();
   ctx.fillStyle = this.color;
   ctx.arc(this.x, this.y, this.size, 0, 2 * Math.PI);
@@ -39,7 +52,7 @@ Ball.prototype.draw = function() {
 }
 
 // 更新小球的轨迹，碰到画布的边缘后“反弹”
-Ball.prototype.update = function() {
+Ball.prototype.update = function () {
   if ((this.x + this.size) >= width) {
     this.velX = -(this.velX);
   }
@@ -61,7 +74,7 @@ Ball.prototype.update = function() {
 }
 
 //碰撞检测
-Ball.prototype.collisionDetect = function() {
+Ball.prototype.collisionDetect = function () {
   for (let j = 0; j < balls.length; j++) {
     if (this !== balls[j]) {
       const dx = this.x - balls[j].x;
@@ -75,34 +88,112 @@ Ball.prototype.collisionDetect = function() {
   }
 }
 
+function EvilCircle(x, y, exists) {
+  Shape.call(this, x, y, 20, 20, exists);
+  this.color = 'white';
+  this.size = 10;
+};
+
+EvilCircle.prototype = Object.create(Shape.prototype);
+EvilCircle.prototype.constructor = EvilCircle;
+
+EvilCircle.prototype.draw = function () {
+  ctx.beginPath();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = this.color;
+  ctx.arc(this.x, this.y, this.size, 0, 2 * Math.PI);
+  ctx.stroke();
+};
+
+// Checkbounds 
+EvilCircle.prototype.checkBounds = function () {
+  if ((this.x + this.size) >= width) {
+    this.x -= this.size;
+  }
+
+  if ((this.x - this.size) <= 0) {
+    this.x += this.size;
+  }
+
+  if ((this.y + this.size) >= height) {
+    this.y -= this.size;
+  }
+
+  if ((this.y - this.size) <= 0) {
+    this.y += this.size;
+  }
+};
+// Set control
+EvilCircle.prototype.setControls = function () {
+  let _this = this;
+  console.log(_this);
+  window.onkeydown = function (e) {
+    if (e.key === 'a') {
+      _this.x -= _this.velX;
+    } else if (e.key === 'd') {
+      _this.x += _this.velX;
+    } else if (e.key === 'w') {
+      _this.y -= _this.velY;
+    } else if (e.key === 's') {
+      _this.y += _this.velY;
+    }
+  }
+};
+// evil ball collision detect
+let countBalls = 0; // number of deleting balls
+
+EvilCircle.prototype.collisionDetect = function () {
+  for (let j = 0; j < balls.length; j++) {
+    if (balls[j].isExist) {
+      const dx = this.x - balls[j].x;
+      const dy = this.y - balls[j].y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < this.size + balls[j].size) {
+        balls[j].isExist = false;
+        countBalls += 1;
+      }
+    }
+  }
+};
+
 //储存一些小球
 let balls = [];
 
 while (balls.length < 25) {
-    let size = random(10, 20);
-    let ball = new Ball(
-      // 为避免绘制错误，球至少离画布边缘球本身一倍宽度的距离
-      random(0 + size, width - size),
-      random(0 + size, height - size),
-      random(-7, 7),
-      random(-7, 7),
-      randomColor(),
-      size
-    );
-    balls.push(ball);
-  }
+  let size = random(10, 20);
+  let ball = new Ball(
+    // 为避免绘制错误，球至少离画布边缘球本身一倍宽度的距离
+    random(0 + size, width - size),
+    random(0 + size, height - size),
+    random(-7, 7),
+    random(-7, 7),
+    true,
+    randomColor(),
+    size
+  );
+  balls.push(ball);
+}
 
+let evilCircle = new EvilCircle(100, 100, true);
+evilCircle.setControls();
 // 动画循环
 function loop() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.fillRect(0, 0, width, height);
-
   for (let i = 0; i < balls.length; i++) {
-    balls[i].draw();
-    balls[i].update();
-    balls[i].collisionDetect();
+    if (balls[i].isExist) {
+      balls[i].draw();
+      balls[i].update();
+      balls[i].collisionDetect();
+    }
+    evilCircle.draw();
+    evilCircle.checkBounds();
+    evilCircle.collisionDetect();
   }
-
+  //Create a variable that stores a reference to the paragraph.
+  let para = document.querySelector('p');
+  para.textContent = "小球还有: " + (25 - countBalls) + "个"; //count balls
   requestAnimationFrame(loop);
 }
 
